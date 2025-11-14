@@ -87,7 +87,7 @@ export class UserService {
             .select('_id')
             .populate({
                 path: 'following',
-                select: 'username avatar bio walletAddress createdAt',
+                select: 'username avatar bio  createdAt',
                 options: { sort: { createdAt: -1 }, limit, skip },
             })
             .lean();

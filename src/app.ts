@@ -34,7 +34,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Rate limiting
-app.use(generalLimiter);
+// app.use(generalLimiter);
 
 // Health check
 app.get('/health', (req, res) => {

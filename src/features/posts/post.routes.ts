@@ -35,7 +35,7 @@ router.use(protect);
 // Create post with optional file uploads (up to 4 images)
 router.post(
     '/',
-    createPostLimiter,
+    // createPostLimiter,
     upload.array('images', 4),
     handleUploadError,
     createPostValidator,

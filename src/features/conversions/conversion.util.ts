@@ -1,0 +1,1 @@
+export const isMultipleOf = (value: number, step: number) => value % step === 0;

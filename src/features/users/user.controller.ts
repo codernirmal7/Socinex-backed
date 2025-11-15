@@ -27,33 +27,24 @@ export class UserController {
         const userId = req.user!._id.toString();
         const updates = req.body;
 
-        // Handle file uploads
+        // ✅ Handle Cloudinary uploads
         const files = req.files as { [fieldname: string]: Express.Multer.File[] };
 
         if (files) {
-            const baseUrl = `${req.protocol}://${req.get('host')}`;
-
-            // Handle avatar upload
+            // Handle avatar upload - Cloudinary URL is in file.path
             if (files.avatar && files.avatar[0]) {
-                if (config.upload.useCloudinary) {
-                    updates.avatar = (files.avatar[0] as any).path;
-                } else {
-                    updates.avatar = `${baseUrl}/uploads/${files.avatar[0].filename}`;
-                }
+                updates.avatar = (files.avatar[0] as any).path;
+                console.log('🖼️ Avatar uploaded to Cloudinary:', updates.avatar);
             }
 
-            // Handle banner upload
+            // Handle banner upload - Cloudinary URL is in file.path
             if (files.banner && files.banner[0]) {
-                if (config.upload.useCloudinary) {
-                    updates.banner = (files.banner[0] as any).path;
-                } else {
-                    updates.banner = `${baseUrl}/uploads/${files.banner[0].filename}`;
-                }
+                updates.banner = (files.banner[0] as any).path;
+                console.log('🖼️ Banner uploaded to Cloudinary:', updates.banner);
             }
         }
 
         const user = await userService.updateProfile(userId, updates);
-
         ApiResponse.success(res, user, 'Profile updated successfully');
     });
 

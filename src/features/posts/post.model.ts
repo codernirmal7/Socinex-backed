@@ -4,6 +4,7 @@ export interface IPost {
     author: Types.ObjectId;
     content: string;
     images?: string[];
+    videos?: string[];
     likes: Types.ObjectId[];
     totalTips: number;
     totalTipAmount: number;
@@ -32,6 +33,16 @@ const postSchema = new Schema<IPostDocument>(
                 type: String,
             },
         ],
+        videos: {
+            type: [String],
+            default: [],
+            validate: {
+                validator: function (arr: string[]) {
+                    return arr.length <= 2; // Max 2 videos per post
+                },
+                message: 'Maximum 2 videos allowed per post',
+            },
+        },
         likes: [
             {
                 type: Schema.Types.ObjectId,

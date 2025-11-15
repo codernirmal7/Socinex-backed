@@ -9,6 +9,7 @@ export const config = {
         batTokenAddress: process.env.BAT_TOKEN_ADDRESS!,
         tokenDecimals: Number(process.env.TOKEN_DECIMALS || 18),
         treasuryPrivateKey: process.env.TREASURY_PRIVATE_KEY!,
+
     },
     env: process.env.NODE_ENV || 'development',
     port: parseInt(process.env.PORT || '5000', 10),
@@ -54,6 +55,9 @@ export const config = {
         maxFiles: parseInt(process.env.MAX_FILES || '4', 10),
         allowedImageTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
         useCloudinary: process.env.USE_CLOUDINARY === 'true',
+        videoDir: process.env.VIDEO_UPLOAD_DIR || 'uploads/videos',
+        maxVideoSize: 100 * 1024 * 1024, // 100MB
+        imageDir: process.env.UPLOAD_DIR || 'uploads/images',
     },
 
     cloudinary: {

@@ -1,91 +1,94 @@
-import multer, { FileFilterCallback } from 'multer';
-import { Request } from 'express';
+// src/middleware/upload.middleware.ts
+import multer from 'multer';
+import { NextFunction } from 'express';
 import path from 'path';
-import fs from 'fs';
 import { config } from '../config';
-import { BadRequestError } from '../utils/errors';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import cloudinary from '../config/cloudinary';
+import { v4 as uuidv4 } from 'uuid';
 
-// Ensure uploads directory exists (for local storage)
-const uploadsDir = path.join(__dirname, '../../uploads');
-if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-}
+// File filter for images and videos
+const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+    const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    const allowedVideoTypes = ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime'];
 
-// File filter for image validation
-const imageFileFilter = (req: Request, file: Express.Multer.File, cb: FileFilterCallback) => {
-    // Check file type
-    if (!config.upload.allowedImageTypes.includes(file.mimetype)) {
-        return cb(
-            new BadRequestError(
-                `Invalid file type. Allowed types: ${config.upload.allowedImageTypes.join(', ')}`
-            )
-        );
+    if (allowedImageTypes.includes(file.mimetype) || allowedVideoTypes.includes(file.mimetype)) {
+        cb(null, true);
+    } else {
+        cb(new Error('Invalid file type. Only images (JPEG, PNG, GIF, WebP) and videos (MP4, WebM, OGG, MOV) are allowed'));
     }
-
-    // Check file extension
-    const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
-    const fileExtension = path.extname(file.originalname).toLowerCase();
-
-    if (!allowedExtensions.includes(fileExtension)) {
-        return cb(new BadRequestError('Invalid file extension'));
-    }
-
-    cb(null, true);
 };
 
-// Local storage configuration
-const localStorage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, uploadsDir);
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-        const ext = path.extname(file.originalname);
-        cb(null, `${file.fieldname}-${uniqueSuffix}${ext}`);
-    },
-});
-
-// Cloudinary storage configuration
+// ✅ Cloudinary storage configuration for both images and videos
 const cloudinaryStorage = new CloudinaryStorage({
     cloudinary: cloudinary,
-    params: {
-        folder: 'socinex',
-        allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
-        transformation: [
-            { width: 1200, height: 1200, crop: 'limit' },
-            { quality: 'auto:good' },
-        ],
-    } as any,
-});
+    params: async (req, file) => {
+        const isVideo = file.mimetype.startsWith('video/');
+        const isImage = file.mimetype.startsWith('image/');
 
-// Choose storage based on config
-const storage = config.upload.useCloudinary ? cloudinaryStorage : localStorage;
+        // Generate unique filename
+        const uniqueFilename = `${uuidv4()}${path.extname(file.originalname)}`;
 
-// Configure multer
-export const upload = multer({
-    storage,
-    fileFilter: imageFileFilter,
-    limits: {
-        fileSize: config.upload.maxFileSize,
-        files: config.upload.maxFiles,
+        if (isVideo) {
+            return {
+                folder: 'socinex/videos',
+                resource_type: 'video',
+                public_id: uniqueFilename,
+                format: path.extname(file.originalname).slice(1), // mp4, webm, etc
+                chunk_size: 6000000, // 6MB chunks for large videos
+                eager: [
+                    { streaming_profile: 'hd', format: 'mp4' },
+                    { streaming_profile: 'sd', format: 'mp4' }
+                ],
+                eager_async: true,
+                allowed_formats: ['mp4', 'webm', 'ogg', 'mov'],
+            };
+        } else if (isImage) {
+            return {
+                folder: 'socinex/images',
+                resource_type: 'image',
+                public_id: uniqueFilename,
+                format: 'jpg', // Convert all to jpg for consistency
+                transformation: [
+                    { width: 1200, height: 1200, crop: 'limit' },
+                    { quality: 'auto:good' },
+                    { fetch_format: 'auto' }
+                ],
+                allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+            };
+        }
+
+        return {
+            folder: 'socinex',
+            resource_type: 'auto',
+            public_id: uniqueFilename,
+        };
     },
 });
 
-// Middleware for handling upload errors
-export const handleUploadError = (err: any, req: Request, res: any, next: any) => {
+// Configure multer with Cloudinary storage
+export const upload = multer({
+    storage: cloudinaryStorage,
+    fileFilter: fileFilter,
+    limits: {
+        fileSize: 100 * 1024 * 1024, // 100MB max for videos
+        files: 6, // Max 6 files (4 images + 2 videos)
+    },
+});
+
+// Error handler
+export const handleUploadError = (err: any, req: any, res: any, next: NextFunction) => {
     if (err instanceof multer.MulterError) {
         if (err.code === 'LIMIT_FILE_SIZE') {
             return res.status(400).json({
                 success: false,
-                message: `File too large. Maximum size is ${config.upload.maxFileSize / 1024 / 1024}MB`,
+                message: 'File too large. Maximum 100MB per file',
             });
         }
         if (err.code === 'LIMIT_FILE_COUNT') {
             return res.status(400).json({
                 success: false,
-                message: `Too many files. Maximum is ${config.upload.maxFiles}`,
+                message: 'Too many files. Maximum 6 files (4 images + 2 videos)',
             });
         }
         return res.status(400).json({
@@ -93,5 +96,14 @@ export const handleUploadError = (err: any, req: Request, res: any, next: any) =
             message: err.message,
         });
     }
-    next(err);
+
+    if (err) {
+        console.error('❌ Upload error:', err);
+        return res.status(400).json({
+            success: false,
+            message: err.message || 'File upload error',
+        });
+    }
+
+    next();
 };

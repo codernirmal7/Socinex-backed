@@ -36,7 +36,10 @@ router.use(protect);
 router.post(
     '/',
     // createPostLimiter,
-    upload.array('images', 4),
+    upload.fields([
+        { name: 'images', maxCount: 4 },
+        { name: 'videos', maxCount: 2 }
+    ]),
     handleUploadError,
     createPostValidator,
     validate,

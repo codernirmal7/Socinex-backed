@@ -7,7 +7,8 @@ export class PostService {
     async createPost(
         authorId: string,
         content: string,
-        images?: string[]
+        images?: string[],
+        videos?: string[]
     ): Promise<IPostDocument> {
         const author = await User.findById(authorId);
 
@@ -15,36 +16,35 @@ export class PostService {
             throw new NotFoundError('User not found');
         }
 
-        // Validate images array
+        // Validate arrays
         if (images && images.length > 4) {
             throw new BadRequestError('Maximum 4 images allowed per post');
+        }
+
+        if (videos && videos.length > 2) {
+            throw new BadRequestError('Maximum 2 videos allowed per post');
+        }
+
+        // Check total media count
+        const totalMedia = (images?.length || 0) + (videos?.length || 0);
+        if (totalMedia > 6) {
+            throw new BadRequestError('Maximum 6 media files allowed per post (4 images + 2 videos)');
         }
 
         const post = await Post.create({
             author: authorId,
             content,
             images: images || [],
+            videos: videos || [],
         });
 
         return await post.populate('author', 'username avatar');
     }
 
-    async getPostById(postId: string): Promise<IPostDocument> {
-        const post = await Post.findById(postId)
-            .populate('author', 'username avatar bio totalPointsEarned')
-            .populate('likes', 'username avatar');
-
-        if (!post) {
-            throw new NotFoundError('Post not found');
-        }
-
-        return post;
-    }
-
     async updatePost(
         postId: string,
         userId: string,
-        updates: { content?: string; images?: string[] }
+        updates: { content?: string; images?: string[]; videos?: string[] }
     ): Promise<IPostDocument> {
         const post = await Post.findById(postId);
 
@@ -52,7 +52,6 @@ export class PostService {
             throw new NotFoundError('Post not found');
         }
 
-        // Check if user is the author
         if (post.author.toString() !== userId) {
             throw new ForbiddenError('You can only update your own posts');
         }
@@ -68,9 +67,36 @@ export class PostService {
             post.images = updates.images;
         }
 
-        await post.save();
+        if (updates.videos !== undefined) {
+            if (updates.videos.length > 2) {
+                throw new BadRequestError('Maximum 2 videos allowed per post');
+            }
+            post.videos = updates.videos;
+        }
 
+        let totalMedia = 0
+        // Check total media
+        if (post.images && post.videos) {
+            totalMedia = post?.images.length + post?.videos.length;
+        }
+        if (totalMedia > 6) {
+            throw new BadRequestError('Maximum 6 media files allowed per post');
+        }
+
+        await post.save();
         return await post.populate('author', 'username avatar');
+    }
+
+    async getPostById(postId: string): Promise<IPostDocument> {
+        const post = await Post.findById(postId)
+            .populate('author', 'username avatar bio totalPointsEarned')
+            .populate('likes', 'username avatar');
+
+        if (!post) {
+            throw new NotFoundError('Post not found');
+        }
+
+        return post;
     }
 
     async deletePost(postId: string, userId: string): Promise<void> {

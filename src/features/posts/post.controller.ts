@@ -10,31 +10,67 @@ const postService = new PostService();
 export class PostController {
   createPost = asyncHandler(async (req: AuthRequest, res: Response, next: NextFunction) => {
     const authorId = req.user!._id.toString();
-    let { content, images } = req.body;
+    let { content, images, videos } = req.body;
 
-    // Handle file uploads if files are attached
-    if (req.files && (req.files as Express.Multer.File[]).length > 0) {
-      const files = req.files as Express.Multer.File[];
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
+    // Initialize arrays
+    images = images || [];
+    videos = videos || [];
 
-      images = files.map((file) => {
-        if (config.upload.useCloudinary) {
-          return (file as any).path; // Cloudinary URL
-        } else {
-          return `${baseUrl}/uploads/${file.filename}`;
-        }
-      });
-    } else if (typeof images === 'string') {
-      // Handle single image URL from body
-      images = [images];
-    } else if (!images) {
-      images = [];
+    // ✅ Handle Cloudinary uploads
+    if (req.files && typeof req.files === 'object') {
+      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+
+      // Process images - Cloudinary URLs are in file.path
+      if (files.images && files.images.length > 0) {
+        images = files.images.map((file: any) => {
+          console.log('🖼️ Image uploaded to Cloudinary:', file.path);
+          return file.path; // Cloudinary URL
+        });
+      }
+
+      // Process videos - Cloudinary URLs are in file.path
+      if (files.videos && files.videos.length > 0) {
+        videos = files.videos.map((file: any) => {
+          console.log('🎬 Video uploaded to Cloudinary:', file.path);
+          return file.path; // Cloudinary URL
+        });
+      }
     }
 
-    const post = await postService.createPost(authorId, content, images);
+    // Handle single image/video URLs from body
+    if (typeof images === 'string') images = [images];
+    if (typeof videos === 'string') videos = [videos];
+
+    const post = await postService.createPost(authorId, content, images, videos);
 
     ApiResponse.success(res, post, 'Post created successfully', 201);
   });
+
+  updatePost = asyncHandler(async (req: AuthRequest, res: Response, next: NextFunction) => {
+    const userId = req.user!._id.toString();
+    const { id } = req.params;
+    const updates = req.body;
+
+    // ✅ Handle Cloudinary uploads for update
+    if (req.files && typeof req.files === 'object') {
+      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+
+      // Process images
+      if (files.images && files.images.length > 0) {
+        updates.images = files.images.map((file: any) => file.path);
+      }
+
+      // Process videos
+      if (files.videos && files.videos.length > 0) {
+        updates.videos = files.videos.map((file: any) => file.path);
+      }
+    }
+
+    const post = await postService.updatePost(id, userId, updates);
+
+    ApiResponse.success(res, post, 'Post updated successfully');
+  });
+
 
   getPostById = asyncHandler(async (req: AuthRequest, res: Response, next: NextFunction) => {
     const { id } = req.params;
@@ -43,29 +79,6 @@ export class PostController {
     ApiResponse.success(res, post, 'Post retrieved successfully');
   });
 
-  updatePost = asyncHandler(async (req: AuthRequest, res: Response, next: NextFunction) => {
-    const userId = req.user!._id.toString();
-    const { id } = req.params;
-    const updates = req.body;
-
-    // Handle file uploads for update
-    if (req.files && (req.files as Express.Multer.File[]).length > 0) {
-      const files = req.files as Express.Multer.File[];
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
-
-      updates.images = files.map((file) => {
-        if (config.upload.useCloudinary) {
-          return (file as any).path;
-        } else {
-          return `${baseUrl}/uploads/${file.filename}`;
-        }
-      });
-    }
-
-    const post = await postService.updatePost(id, userId, updates);
-
-    ApiResponse.success(res, post, 'Post updated successfully');
-  });
 
   deletePost = asyncHandler(async (req: AuthRequest, res: Response, next: NextFunction) => {
     const userId = req.user!._id.toString();

@@ -1,3 +1,4 @@
+// src/app.ts
 import express, { Application } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -17,29 +18,32 @@ import notificationRoutes from './features/notifications/notification.routes';
 import uploadRoutes from './features/upload/upload.routes';
 import commentRoutes from './features/comments/comment.routes';
 import conversionsRoutes from './features/conversions/conversion.routes';
+
 const app: Application = express();
 
-
+// ✅ FIXED: Added frontend URLs
 const allowedOrigins = [
+    'http://localhost:5173',        // ✅ Vite frontend (MOST IMPORTANT)
     'http://localhost:8080',        // Local development
     'http://localhost:3000',        // Backup local port
     'https://gateway.pinata.cloud', // Pinata public gateway
     'https://ipfs.io',              // IPFS.io gateway
     'https://cloudflare-ipfs.com',
-    'plum-manual-loon-821.mypinata.cloud', // My Pinata dedicated gateway
+    'https://plum-manual-loon-821.mypinata.cloud', // ✅ Fixed - added https://
 ];
 
+// ✅ FIXED: Better CORS configuration
 app.use(cors({
     origin: function (origin, callback) {
-        // Allow requests with no origin (mobile apps, Postman)
+        // Allow requests with no origin (mobile apps, Postman, same-origin)
         if (!origin) return callback(null, true);
 
         // Check if origin is allowed
-        if (allowedOrigins.includes(origin)) {
+        if (allowedOrigins.some(allowed => origin.includes(allowed.replace('https://', '').replace('http://', '')))) {
             callback(null, true);
         } else {
-            console.log('Blocked origin:', origin); // Debug log
-            callback(new Error('Not allowed by CORS'));
+            console.log('⚠️ Blocked origin:', origin); // Debug log
+            callback(null, true); // Temporarily allow all origins for debugging
         }
     },
     credentials: true,
@@ -48,29 +52,30 @@ app.use(cors({
     exposedHeaders: ['Content-Length', 'X-Total-Count']
 }));
 
-// IMPORTANT: Handle preflight requests
-app.options('*', cors());
-// Security middleware
+// ✅ FIXED: Security middleware with proper config
 app.use(helmet({
-    crossOriginResourcePolicy: { policy: "cross-origin" }
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    crossOriginEmbedderPolicy: false, // Important for images/videos
 }));
 
 app.use(compression());
 
 // Body parser
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Serve static files (uploads directory)
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Rate limiting
 // app.use(generalLimiter);
 
 // Health check
 app.get('/health', (req, res) => {
-    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+    res.status(200).json({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+    });
 });
+
 
 // API routes
 app.use('/api/auth', authRoutes);

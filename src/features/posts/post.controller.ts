@@ -16,7 +16,7 @@ export class PostController {
     if (req.files && (req.files as Express.Multer.File[]).length > 0) {
       const files = req.files as Express.Multer.File[];
       const baseUrl = `${req.protocol}://${req.get('host')}`;
-      
+
       images = files.map((file) => {
         if (config.upload.useCloudinary) {
           return (file as any).path; // Cloudinary URL
@@ -52,7 +52,7 @@ export class PostController {
     if (req.files && (req.files as Express.Multer.File[]).length > 0) {
       const files = req.files as Express.Multer.File[];
       const baseUrl = `${req.protocol}://${req.get('host')}`;
-      
+
       updates.images = files.map((file) => {
         if (config.upload.useCloudinary) {
           return (file as any).path;
@@ -152,20 +152,20 @@ export class PostController {
     ApiResponse.success(res, posts, 'Trending posts retrieved successfully');
   });
 
-  searchPosts = asyncHandler(async (req: AuthRequest, res: Response, next: NextFunction) => {
+  searchPosts = asyncHandler(async (req: AuthRequest, res: Response) => {
     const query = req.query.q as string;
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
 
     const result = await postService.searchPosts(query, page, limit);
 
-    ApiResponse.paginated(
-      res,
-      result.posts,
-      result.page,
-      result.limit,
-      result.total,
-      'Posts retrieved successfully'
-    );
+    // result.posts, result.page, result.limit, result.total
+    res.json({
+      posts: result.posts,
+      page: result.page,
+      limit: result.limit,
+      total: result.total,
+    });
   });
+
 }

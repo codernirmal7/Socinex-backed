@@ -19,11 +19,34 @@ import commentRoutes from './features/comments/comment.routes';
 import conversionsRoutes from './features/conversions/conversion.routes';
 const app: Application = express();
 
+
+const allowedOrigins = [
+    'http://localhost:8080',        // Local development
+    'http://localhost:3000',        // Backup local port
+    'https://gateway.pinata.cloud', // Pinata public gateway
+    'https://ipfs.io',              // IPFS.io gateway
+    'plum-manual-loon-821.mypinata.cloud', // My Pinata dedicated gateway
+];
+
 // Security middleware
 app.use(helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
-app.use(cors(config.cors));
+app.use(cors({
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl)
+        if (!origin) return callback(null, true);
+
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true, // If you're using cookies (but you should use JWT)
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(compression());
 
 // Body parser
